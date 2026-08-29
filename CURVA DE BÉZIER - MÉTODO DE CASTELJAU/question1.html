@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Curva de Bézier - Método de Casteljau</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#1e1e24; color:#eee; display:flex; flex-direction:column; align-items:center; padding:24px; }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  p.sub { color:#999; margin-top:0; font-size: 14px;}
+  #wrap { background:#2a2a33; padding:16px; border-radius:10px; box-shadow:0 4px 20px rgba(0,0,0,.4); }
+  canvas { background:#f4f4f8; border-radius:6px; cursor:grab; display:block; }
+  #info { margin-top:10px; font-size:13px; color:#bbb; display:flex; justify-content:space-between; }
+  #coords { background:#12121a; padding:4px 10px; border-radius:5px; font-family: monospace; }
+  .legend { display:flex; gap:16px; margin-top:8px; font-size:12px; color:#aaa; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:4px; vertical-align:middle;}
+</style>
+</head>
+<body>
+<h1>Curva de Bézier — Método de Casteljau</h1>
+<p class="sub">Arraste os 4 pontos de controle (p1, p2, p3, p4). Mova o mouse sobre o canvas para ver a construção do algoritmo de Casteljau para o t correspondente.</p>
+<div id="wrap">
+  <canvas id="c" width="700" height="420"></canvas>
+  <div id="info">
+    <span id="coords">X: -, Y: -</span>
+    <span id="tval">t: -</span>
+  </div>
+  <div class="legend">
+    <span><span class="dot" style="background:#8e8ef0"></span>p1..p4 (controle)</span>
+    <span><span class="dot" style="background:#4caf50"></span>pa1,pa2,pa3 (t=1º nível)</span>
+    <span><span class="dot" style="background:#ff9800"></span>pb1,pb2 (t=2º nível)</span>
+    <span><span class="dot" style="background:#e53935"></span>p (ponto final na curva)</span>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// pontos de controle
+let points = [
+  {x: 100, y: 340},
+  {x: 180, y: 90},
+  {x: 500, y: 90},
+  {x: 600, y: 300}
+];
+
+let dragIndex = -1;
+let mouseX = null, mouseY = null;
+
+function lerp(A, B, t) {
+  return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t };
+}
+
+// algoritmo de casteljau: retorna todos os níveis intermediários e o ponto final
+function casteljau(p1, p2, p3, p4, t) {
+  const pa1 = lerp(p1, p2, t);
+  const pa2 = lerp(p2, p3, t);
+  const pa3 = lerp(p3, p4, t);
+
+  const pb1 = lerp(pa1, pa2, t);
+  const pb2 = lerp(pa2, pa3, t);
+
+  const p = lerp(pb1, pb2, t);
+
+  return { pa1, pa2, pa3, pb1, pb2, p };
+}
+
+function drawPoint(pt, color, r = 6, label = null) {
+  ctx.beginPath();
+  ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  if (label) {
+    ctx.fillStyle = '#333';
+    ctx.font = '11px monospace';
+    ctx.fillText(label, pt.x + 8, pt.y - 8);
+  }
+}
+
+function drawLine(A, B, color, width = 1, dash = []) {
+  ctx.beginPath();
+  ctx.setLineDash(dash);
+  ctx.moveTo(A.x, A.y);
+  ctx.lineTo(B.x, B.y);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const [p1, p2, p3, p4] = points;
+
+  // Poligono de controle
+  drawLine(p1, p2, '#c9c9d8', 1, [4,4]);
+  drawLine(p2, p3, '#c9c9d8', 1, [4,4]);
+  drawLine(p3, p4, '#c9c9d8', 1, [4,4]);
+
+  // curva de bezier
+  ctx.beginPath();
+  for (let i = 0; i <= 100; i++) {
+    const t = i / 100;
+    const { p } = casteljau(p1, p2, p3, p4, t);
+    if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+  }
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // pontos de controle
+  points.forEach((pt, i) => drawPoint(pt, '#8e8ef0', 7, 'p' + (i + 1)));
+
+  // construcao de Casteljau para o t do mouse
+  if (mouseX !== null) {
+    // aproxima t pela posicao x do mouse dentro do bounding box em x dos pontos
+    let t = mouseX / canvas.width;
+    t = Math.max(0, Math.min(1, t));
+
+    const { pa1, pa2, pa3, pb1, pb2, p } = casteljau(p1, p2, p3, p4, t);
+
+    drawLine(pa1, pa2, '#4caf50', 1.2);
+    drawLine(pa2, pa3, '#4caf50', 1.2);
+    drawPoint(pa1, '#4caf50', 5, 'pa1');
+    drawPoint(pa2, '#4caf50', 5, 'pa2');
+    drawPoint(pa3, '#4caf50', 5, 'pa3');
+
+    drawLine(pb1, pb2, '#ff9800', 1.2);
+    drawPoint(pb1, '#ff9800', 5, 'pb1');
+    drawPoint(pb2, '#ff9800', 5, 'pb2');
+
+    drawPoint(p, '#e53935', 6, 'p');
+
+    document.getElementById('tval').textContent = 't: ' + t.toFixed(2);
+  }
+}
+
+function getMousePos(evt) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (evt.clientX - rect.left) * (canvas.width / rect.width),
+    y: (evt.clientY - rect.top) * (canvas.height / rect.height)
+  };
+}
+
+canvas.addEventListener('mousedown', (e) => {
+  const pos = getMousePos(e);
+  dragIndex = points.findIndex(p => Math.hypot(p.x - pos.x, p.y - pos.y) < 12);
+  canvas.style.cursor = dragIndex >= 0 ? 'grabbing' : 'grab';
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const pos = getMousePos(e);
+  mouseX = pos.x;
+  mouseY = pos.y;
+  document.getElementById('coords').textContent = `X: ${Math.round(pos.x)}, Y: ${Math.round(pos.y)}`;
+
+  if (dragIndex >= 0) {
+    points[dragIndex] = pos;
+  }
+  draw();
+});
+
+canvas.addEventListener('mouseup', () => { dragIndex = -1; canvas.style.cursor = 'grab'; });
+canvas.addEventListener('mouseleave', () => { dragIndex = -1; });
+
+draw();
+</script>
+</body>
+</html>
