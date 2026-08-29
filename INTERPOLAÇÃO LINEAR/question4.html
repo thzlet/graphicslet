@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Interpolação Linear (RGB / HSL)</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#1e1e24; color:#eee; padding:24px; max-width:900px; margin:auto; }
+  h1 { font-size:20px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; align-items:center; margin:10px 0; }
+  label { font-size:13px; color:#aaa; display:block; margin-bottom:4px; }
+  input[type=color] { width:50px; height:34px; border:none; background:none; cursor:pointer; }
+  input[type=number] { width:70px; padding:6px; border-radius:5px; border:1px solid #444; background:#2a2a33; color:#eee; }
+  select { padding:6px; border-radius:5px; background:#2a2a33; color:#eee; border:1px solid #444; }
+  #strip { display:flex; margin-top:20px; border-radius:8px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,.4); height:90px; }
+  .swatch { flex:1; display:flex; align-items:flex-end; justify-content:center; font-size:10px; color:rgba(0,0,0,.55); padding-bottom:4px; font-family:monospace; }
+</style>
+</head>
+<body>
+<h1>Interpolação Linear (RGB / HSL)</h1>
+
+<div class="row">
+  <div><label>Cor inicial</label><input type="color" id="colorA" value="#ff0000"></div>
+  <div><label>Cor final</label><input type="color" id="colorB" value="#ffff00"></div>
+  <div><label>Número (Enter)</label><input type="number" id="numDivs" min="2" max="60" value="10"></div>
+  <div><label>Espaço de interpolação</label>
+    <select id="mode">
+      <option value="rgb">RGB</option>
+      <option value="hsl">HSL</option>
+    </select>
+  </div>
+</div>
+
+<div id="strip"></div>
+
+<script>
+function hexToRgb(hex) {
+  const v = parseInt(hex.slice(1), 16);
+  return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+}
+function rgbToHex(r, g, b) {
+  const c = n => Math.round(n).toString(16).padStart(2, '0');
+  return '#' + c(r) + c(g) + c(b);
+}
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+function hslToRgb(h, s, l) {
+  h /= 360; s /= 100; l /= 100;
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return { r: r * 255, g: g * 255, b: b * 255 };
+}
+
+// lerp genérico
+function Lerp(A, B, t) { return A + (B - A) * t; }
+
+function render() {
+  const cA = hexToRgb(document.getElementById('colorA').value);
+  const cB = hexToRgb(document.getElementById('colorB').value);
+  const n = Math.max(2, parseInt(document.getElementById('numDivs').value) || 2);
+  const mode = document.getElementById('mode').value;
+  const strip = document.getElementById('strip');
+  strip.innerHTML = '';
+
+  let hslA, hslB;
+  if (mode === 'hsl') {
+    hslA = rgbToHsl(cA.r, cA.g, cA.b);
+    hslB = rgbToHsl(cB.r, cB.g, cB.b);
+  }
+
+  for (let i = 0; i < n; i++) {
+    const t = i / (n - 1);
+    let rgb;
+    if (mode === 'rgb') {
+      rgb = {
+        r: Lerp(cA.r, cB.r, t),
+        g: Lerp(cA.g, cB.g, t),
+        b: Lerp(cA.b, cB.b, t)
+      };
+    } else {
+      const h = Lerp(hslA.h, hslB.h, t);
+      const s = Lerp(hslA.s, hslB.s, t);
+      const l = Lerp(hslA.l, hslB.l, t);
+      rgb = hslToRgb(h, s, l);
+    }
+    const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+    const div = document.createElement('div');
+    div.className = 'swatch';
+    div.style.background = hex;
+    div.textContent = 'Lerp(' + i + '/' + (n - 1) + ')';
+    strip.appendChild(div);
+  }
+}
+
+['colorA', 'colorB', 'mode'].forEach(id =>
+  document.getElementById(id).addEventListener('input', render)
+);
+document.getElementById('numDivs').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') render();
+});
+document.getElementById('numDivs').addEventListener('change', render);
+
+render();
+</script>
+</body>
+</html>
