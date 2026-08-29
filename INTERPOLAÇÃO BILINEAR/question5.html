@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Interpolação Bilinear (RGB HSL)</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#1e1e24; color:#eee; padding:24px; max-width:900px; margin:auto; }
+  h1 { font-size:20px; }
+  .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-end; margin:14px 0; }
+  label { font-size:12px; color:#aaa; display:block; margin-bottom:4px; }
+  input[type=color] { width:50px; height:34px; border:none; background:none; cursor:pointer; }
+  input[type=number] { width:60px; padding:6px; border-radius:5px; border:1px solid #444; background:#2a2a33; color:#eee; }
+  select { padding:6px; border-radius:5px; background:#2a2a33; color:#eee; border:1px solid #444; }
+  .corners { display:grid; grid-template-columns: repeat(2, auto); gap: 10px 28px; }
+  #grid { display:grid; margin-top:22px; border-radius:8px; overflow:hidden; box-shadow:0 4px 16px rgba(0,0,0,.4); width: 500px; height: 500px; }
+  .cell { }
+</style>
+</head>
+<body>
+<h1>Interpolação Bilinear (RGB / HSL)</h1>
+<p style="color:#999; font-size:13px;">4 cores nos cantos (A, B, C, D). Interpola horizontalmente (Lerp A→B e C→D) e depois verticalmente entre os resultados.</p>
+
+<div class="row">
+  <div class="corners">
+    <div><label>A (topo-esquerda)</label><input type="color" id="cA" value="#ff0000"></div>
+    <div><label>B (topo-direita)</label><input type="color" id="cB" value="#ffff00"></div>
+    <div><label>C (baixo-esquerda)</label><input type="color" id="cC" value="#0000ff"></div>
+    <div><label>D (baixo-direita)</label><input type="color" id="cD" value="#00ff00"></div>
+  </div>
+</div>
+
+<div class="row">
+  <div><label>Colunas (nº)</label><input type="number" id="cols" min="2" max="30" value="8"></div>
+  <div><label>Linhas (nº)</label><input type="number" id="rows" min="2" max="30" value="8"></div>
+  <div><label>Espaço de interpolação</label>
+    <select id="mode">
+      <option value="rgb">RGB</option>
+      <option value="hsl">HSL</option>
+    </select>
+  </div>
+  <div><button id="go" style="padding:8px 14px; border-radius:6px; border:none; background:#5a5aeb; color:#fff; cursor:pointer;">Gerar</button></div>
+</div>
+
+<div id="grid"></div>
+
+<script>
+function hexToRgb(hex) {
+  const v = parseInt(hex.slice(1), 16);
+  return { r: (v >> 16) & 255, g: (v >> 8) & 255, b: v & 255 };
+}
+function rgbToHex(r, g, b) {
+  const c = n => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0');
+  return '#' + c(r) + c(g) + c(b);
+}
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+function hslToRgb(h, s, l) {
+  h /= 360; s /= 100; l /= 100;
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return { r: r * 255, g: g * 255, b: b * 255 };
+}
+
+function Lerp(A, B, t) { return A + (B - A) * t; }
+
+function lerpColor(c1, c2, t, mode) {
+  if (mode === 'rgb') {
+    return {
+      r: Lerp(c1.r, c2.r, t),
+      g: Lerp(c1.g, c2.g, t),
+      b: Lerp(c1.b, c2.b, t)
+    };
+  } else {
+    const h1 = rgbToHsl(c1.r, c1.g, c1.b);
+    const h2 = rgbToHsl(c2.r, c2.g, c2.b);
+    const h = Lerp(h1.h, h2.h, t);
+    const s = Lerp(h1.s, h2.s, t);
+    const l = Lerp(h1.l, h2.l, t);
+    return hslToRgb(h, s, l);
+  }
+}
+
+// lerp horizontal (A-B e C-D), depois lerp vertical entre os resultados
+function bilinear(A, B, C, D, tx, ty, mode) {
+  const top = lerpColor(A, B, tx, mode);    // lerp entre A e B
+  const bottom = lerpColor(C, D, tx, mode); // lerp entre C e D
+  return lerpColor(top, bottom, ty, mode);  // lerp vertical
+}
+
+function render() {
+  const A = hexToRgb(document.getElementById('cA').value);
+  const B = hexToRgb(document.getElementById('cB').value);
+  const C = hexToRgb(document.getElementById('cC').value);
+  const D = hexToRgb(document.getElementById('cD').value);
+  const cols = Math.max(2, parseInt(document.getElementById('cols').value) || 2);
+  const rows = Math.max(2, parseInt(document.getElementById('rows').value) || 2);
+  const mode = document.getElementById('mode').value;
+
+  const grid = document.getElementById('grid');
+  grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+  grid.innerHTML = '';
+
+  for (let row = 0; row < rows; row++) {
+    const ty = row / (rows - 1);
+    for (let col = 0; col < cols; col++) {
+      const tx = col / (cols - 1);
+      const rgb = bilinear(A, B, C, D, tx, ty, mode);
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.style.background = rgbToHex(rgb.r, rgb.g, rgb.b);
+      grid.appendChild(cell);
+    }
+  }
+}
+
+['cA', 'cB', 'cC', 'cD', 'mode', 'cols', 'rows'].forEach(id =>
+  document.getElementById(id).addEventListener('input', render)
+);
+document.getElementById('go').addEventListener('click', render);
+
+render();
+</script>
+</body>
+</html>
