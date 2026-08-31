@@ -36,6 +36,7 @@
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 
+// esse codigo implementa a curva de bezier usando o algoritmo de casteljau e desenha as etapas da construção
 // pontos de controle
 let points = [
   {x: 100, y: 340},
@@ -47,18 +48,20 @@ let points = [
 let dragIndex = -1;
 let mouseX = null, mouseY = null;
 
+// interpolação linear
 function lerp(A, B, t) { // essa função calcula um ponto entre A e B, proporcional ao parâmetro t, que varia de 0 a 1
   return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t }; // se t = 0, A; se t = 1, B; se t = 0.5, ponto médio;
 }
 
 // algoritmo de casteljau: retorna todos os níveis intermediários e o ponto final
 // casteljau eh basicamente aplicar lerp várias vezes
+// reduz recursivamente os pontos por lerp
 function casteljau(p1, p2, p3, p4, t) {
   const pa1 = lerp(p1, p2, t); // a cada passo, interpola um par de pontos com o mesmo t, reduzindo a lista em q até sobrar só um ponto;
-  const pa2 = lerp(p2, p3, t);
-  const pa3 = lerp(p3, p4, t);
+  const pa2 = lerp(p2, p3, t); // interpola entre o 2 e o 3
+  const pa3 = lerp(p3, p4, t); // entre o 3 e o 4
 
-  const pb1 = lerp(pa1, pa2, t);
+  const pb1 = lerp(pa1, pa2, t); // reduz os pontos
   const pb2 = lerp(pa2, pa3, t);
 
   const p = lerp(pb1, pb2, t);
@@ -99,7 +102,7 @@ function draw() {
   drawLine(p2, p3, '#c9c9d8', 1, [4,4]);
   drawLine(p3, p4, '#c9c9d8', 1, [4,4]);
 
-  // curva de bezier
+  // curva de bezier: desenhando a curva
   ctx.beginPath();
   for (let i = 0; i <= 100; i++) { // varre t de 0 a 1 em 100 passos, chama casteljau pra cada t e usa o ponto final p de cada chamada pra traçar a curva;
     const t = i / 100;
