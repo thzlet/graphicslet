@@ -47,13 +47,14 @@ let points = [
 let dragIndex = -1;
 let mouseX = null, mouseY = null;
 
-function lerp(A, B, t) {
-  return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t };
+function lerp(A, B, t) { // essa função calcula um ponto entre A e B, proporcional ao parâmetro t, que varia de 0 a 1
+  return { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t }; // se t = 0, A; se t = 1, B; se t = 0.5, ponto médio;
 }
 
 // algoritmo de casteljau: retorna todos os níveis intermediários e o ponto final
+// casteljau eh basicamente aplicar lerp várias vezes
 function casteljau(p1, p2, p3, p4, t) {
-  const pa1 = lerp(p1, p2, t);
+  const pa1 = lerp(p1, p2, t); // a cada passo, interpola um par de pontos com o mesmo t, reduzindo a lista em q até sobrar só um ponto;
   const pa2 = lerp(p2, p3, t);
   const pa3 = lerp(p3, p4, t);
 
@@ -93,14 +94,14 @@ function draw() {
 
   const [p1, p2, p3, p4] = points;
 
-  // Poligono de controle
+  // poligono de controle
   drawLine(p1, p2, '#c9c9d8', 1, [4,4]);
   drawLine(p2, p3, '#c9c9d8', 1, [4,4]);
   drawLine(p3, p4, '#c9c9d8', 1, [4,4]);
 
   // curva de bezier
   ctx.beginPath();
-  for (let i = 0; i <= 100; i++) {
+  for (let i = 0; i <= 100; i++) { // varre t de 0 a 1 em 100 passos, chama casteljau pra cada t e usa o ponto final p de cada chamada pra traçar a curva;
     const t = i / 100;
     const { p } = casteljau(p1, p2, p3, p4, t);
     if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
@@ -112,8 +113,8 @@ function draw() {
   // pontos de controle
   points.forEach((pt, i) => drawPoint(pt, '#8e8ef0', 7, 'p' + (i + 1)));
 
-  // construcao de Casteljau para o t do mouse
-  if (mouseX !== null) {
+  // construcao de casteljau para o t do mouse
+  if (mouseX !== null) { // parte visual 
     // aproxima t pela posicao x do mouse dentro do bounding box em x dos pontos
     let t = mouseX / canvas.width;
     t = Math.max(0, Math.min(1, t));
