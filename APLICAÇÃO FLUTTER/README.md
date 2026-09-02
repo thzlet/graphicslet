@@ -2,7 +2,7 @@
 
 ## Aplicação Flutter - Cores de Fundo
 
-Aplicação desenvolvida em Flutter com quadrados coloridos na tela.
+Aplicação desenvolvida em Flutter com quadrados coloridos na tela. // Isso é um esboço.
 
 Ao clicar em um dos quadrados, a cor de fundo da tela é alterada para a cor selecionada.
 
